@@ -1,15 +1,16 @@
+// LIBS
 #include <Arduino.h>
 #include <FirebaseArduino.h>
 #include <ESP8266WiFi.h>
 #include <EmonLiteESP.h>
-/***----------------------- BANCO --------------------------***/
+/*---------------- DATABASE-------------------*/
 #define FIREBASE_HOST "yourFB-host.firebaseio.com"
 #define FIREBASE_AUTH "yourFBauth"
-/***---------------- SENHAS--------------------***/
-#define WIFI_SSID "xxx"
-#define WIFI_PASSWORD "00000"
-
-// Aanalog GPIO on the ESP8266
+//Your Wi-Fi SSID and Password
+#define WIFI_SSID "netvirtua260"
+#define WIFI_PASSWORD "3123270860"
+/*------ESP8266 DIFINES FOR MEASUREMENT------------*/
+// Analog GPIO on the ESP8266
 #define CURRENT_PIN             0
 // If using a node ESP8266 board it will be 1.0V, if using a NodeMCU there
 // is a voltage divider in place, so use 3.3V instead.
@@ -25,12 +26,11 @@
 // using.
 #define CURRENT_RATIO           23   // based on 30ohm burden resistor and 2000 windings in SCT-013-000 //29
 // This version of the library only calculate aparent power, so it asumes a fixes
-// mains voltage
-#define MAINS_VOLTAGE           127
+// main voltage
+#define MAIN_VOLTAGE           127
 // Number of samples each time you measure
 #define SAMPLES_X_MEASUREMENT   1024
 
-//_______________________________________________________________________//
 EmonLiteESP power;
 
 unsigned int currentCallback() {
@@ -43,14 +43,15 @@ void setup() {
   //Conexão com o WIFI
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("\n connecting");
+  
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
     delay(250);
   }
+  
   Serial.println();
   Serial.print("connected: ");
   Serial.println(WiFi.localIP());
-
 
   power.initCurrent(currentCallback, ADC_BITS, REFERENCE_VOLTAGE, CURRENT_RATIO);
   Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
@@ -67,8 +68,9 @@ void loop() {
     Serial.println(Firebase.error());
     return;
   }
+  
   float current = power.getCurrent(SAMPLES_X_MEASUREMENT);
-  int power = int (current * MAINS_VOLTAGE);
+  int power = int (current * MAIN_VOLTAGE);
 
   DynamicJsonBuffer jsonBuffer;
   JsonObject& timeObject = jsonBuffer.createObject();
@@ -78,8 +80,10 @@ void loop() {
   timeObject["power"] = power;
   JsonObject& tempTime = timeObject.createNestedObject("timestamp");
   tempTime[".sv"] = "timestamp";
-
-  Firebase.push("sensor/", timeObject);
-
-  delay(9000);
+  
+  if(current <= 0){
+    Serial.print("NO MEASUREMENT DETECTED - Object: " ); Serial.print(timeObject);
+  }else Firebase.push("sensor/", timeObject);
+ 
+  delay(60000);
 }
